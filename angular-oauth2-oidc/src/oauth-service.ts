@@ -10,6 +10,7 @@ import { OAuthEvent, OAuthInfoEvent, OAuthErrorEvent, OAuthSuccessEvent } from '
 import { OAuthStorage, LoginOptions, ParsedIdToken, OidcDiscoveryDoc, TokenResponse, UserInfo } from './types';
 import { b64DecodeUnicode } from './base64-helper';
 import { AuthConfig } from './auth.config';
+import {UtilsService} from "./utils-service";
 
 /**
  * Service for logging in and logging out with
@@ -87,7 +88,7 @@ export class OAuthService
         if (config) {
             this.configure(config);
         }
-  
+
         try {
             if (storage) {
                 this.setStorage(storage);
@@ -143,7 +144,7 @@ export class OAuthService
     }
 
     /**
-     * 
+     *
      * @param params Additional parameter to pass
      */
     public setupAutomaticSilentRefresh(params: object = {}) {
@@ -621,7 +622,7 @@ export class OAuthService
         return this.fetchToken(params);
     }
 
-    private fetchToken(params: HttpParams): Promise<object> {    
+    private fetchToken(params: HttpParams): Promise<object> {
 
         if (!this.validateUrlForHttps(this.tokenEndpoint)) {
             throw new Error('tokenEndpoint must use Http. Also check property requireHttps.');
@@ -645,7 +646,7 @@ export class OAuthService
                     this.storeAccessTokenResponse(tokenResponse.access_token, tokenResponse.refresh_token, tokenResponse.expires_in);
 
                     if (this.oidc && tokenResponse.id_token) {
-                        this.processIdToken(tokenResponse.id_token, tokenResponse.access_token).  
+                        this.processIdToken(tokenResponse.id_token, tokenResponse.access_token).
                         then(result => {
                             this.storeIdToken(result);
                         })
@@ -1011,12 +1012,12 @@ export class OAuthService
             }
         }
 
-        return Promise.resolve(url);  
+        return Promise.resolve(url);
 
     };
 
     private initImplicitFlowInternal(additionalState = '', params: string | object = ''): void {
-        
+
         if (this.inImplicitFlow) {
             return;
         }
@@ -1053,7 +1054,7 @@ export class OAuthService
      *
      * @param additionalState Optinal state that is passes around.
      *  You find this state in the property ``state`` after ``tryLogin`` logged in the user.
-     * @param params Hash with additional parameter. If it is a string, it is used for the 
+     * @param params Hash with additional parameter. If it is a string, it is used for the
      *               parameter loginHint (for the sake of compatibility with former versions)
      */
     public initImplicitFlow(additionalState = '', params: string | object = ''): void {
@@ -1071,7 +1072,7 @@ export class OAuthService
      * the auth servers login url.
      */
     public initAuthorizationCodeFlow(): void {
-        
+
         if (!this.validateUrlForHttps(this.loginUrl)) {
             throw new Error('loginUrl must use Http. Also check property requireHttps.');
         }
@@ -1084,9 +1085,9 @@ export class OAuthService
             console.error(error);
         });
     };
-    
+
     private getResponseType(implicit: boolean): string {
-        
+
         if (implicit) {
             if (this.oidc && this.requestAccessToken) {
                 return 'id_token token';
@@ -1101,7 +1102,7 @@ export class OAuthService
             return 'code';
         }
     }
-    
+
     private callOnTokenReceivedIfExists(options: LoginOptions): void {
         let that = this;
         if (options.onTokenReceived) {
@@ -1153,27 +1154,33 @@ export class OAuthService
         }
     };
 
+
+
     private tryLoginAuthorizationCode(): Promise<void> {
 
-        var parameter = window.location.search.split("&")[0].replace("?","").split("=");
-        if (parameter[0] == 'code') {
-            var code = parameter[1];
+        const parameter = window.location.search.split("&")[0].replace("?","").split("=");
+        const code = UtilsService.getParams(parameter, 'code');
+        const redirectUri = UtilsService.getParams(parameter, 'redirect_uri');
+        const state = UtilsService.getParams(parameter, 'state');
+        if (typeof (code || redirectUri || state) !== undefined) {
 
             return new Promise((resolve, reject) => {
-                this.getTokenFromCode(code).then(result => {
-                    resolve();
-                }).catch(err => {
-                    reject(err);
-                });
+                window.location.replace(`${redirectUri}?code=${code}&state=${state}`);
+
+                // this.getTokenFromCode(code).then(result => {
+                //     resolve();
+                // }).catch(err => {
+                //     reject(err);
+                // });
             });
         } else {
             return Promise.resolve();
-        }  
+        }
     }
 
     private tryLoginImplicit(options: LoginOptions = null): Promise<void> {
         let parts: object;
-        
+
         if (options.customHashFragment) {
             parts = this.urlHelper.getHashFragmentParams(options.customHashFragment);
         }
@@ -1190,7 +1197,7 @@ export class OAuthService
             this.eventsSubject.next(err);
             return Promise.reject(err);
         }
-        
+
         let accessToken = parts['access_token'];
         let idToken = parts['id_token'];
         let state = decodeURIComponent(parts['state']);
@@ -1238,7 +1245,7 @@ export class OAuthService
         if (!this.oidc) {
             this.eventsSubject.next(new OAuthSuccessEvent('token_received'));
             if (this.clearHashAfterLogin) location.hash = '';
-            return Promise.resolve();  
+            return Promise.resolve();
         }
 
         return this
@@ -1554,7 +1561,7 @@ export class OAuthService
         this._storage.removeItem('access_token_stored_at');
 
         this.silentRefreshSubject = null;
-      
+
         this.eventsSubject.next(new OAuthInfoEvent('logout'));
 
         if (!this.logoutUrl) return;
@@ -1586,7 +1593,7 @@ export class OAuthService
     public createAndSaveNonce(): string {
         let nonce = this.createNonce();
         this._storage.setItem('nonce', nonce);
-        return nonce; 
+        return nonce;
     };
 
     protected createNonce(): string {
